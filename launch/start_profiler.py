@@ -21,10 +21,10 @@ def generate_launch_description():
             executable="start",
             name="mechmind_profiler_publisher_service",
             output="screen",
-            prefix="xterm -e",
+
             parameters=[
                 {"save_file": True},
-                {"profiler_ip": "172.20.112.1"}   # change to your profiler ip
+                {"profiler_ip": "192.168.0.37"}   # change to your profiler ip
             ]
         )
     ])

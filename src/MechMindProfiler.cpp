@@ -46,7 +46,6 @@ void convertToROSMsg(const mmind::eye::ProfileBatch& batch, float xResolution, f
     texturedCloud.row_step = texturedCloud.point_step * texturedCloud.width;
     cloud.data.resize(cloud.row_step * cloud.height);
     texturedCloud.data.resize(texturedCloud.row_step * texturedCloud.height);
-
     cloud.fields.reserve(3);
     cloud.fields.push_back(createPointField("x", 0, sensor_msgs::msg::PointField::FLOAT32, 1));
     cloud.fields.push_back(
@@ -92,9 +91,9 @@ MechMindProfiler::MechMindProfiler()
 {
     node = rclcpp::Node::make_shared("mechmind_profiler_publisher_service");
 
-    node->declare_parameter<std::string>("profiler_ip", "");
+    node->declare_parameter<std::string>("profiler_ip", "192.168.0.37");
     node->declare_parameter<bool>("save_file", false);
-
+    
     node->get_parameter("profiler_ip", profiler_ip);
     node->get_parameter("save_file", save_file);
 
@@ -106,31 +105,31 @@ MechMindProfiler::MechMindProfiler()
     pub_textured_pcl = node->create_publisher<sensor_msgs::msg::PointCloud2>(
         "/mechmind_profiler/textured_point_cloud", 1);
 
-    if (!findAndConnect(profiler))
-        throw mmind::eye::ErrorStatus{mmind::eye::ErrorStatus::MMIND_STATUS_INVALID_DEVICE,
-                                      "Profiler not found."};
+    // if (!findAndConnect(profiler))
+    //     throw mmind::eye::ErrorStatus{mmind::eye::ErrorStatus::MMIND_STATUS_INVALID_DEVICE,
+    //                                   "Profiler not found."};
 
     // Uncomment the following lines and comment the above if function to connect to a specific
     // profiler by its IP address. The IP address is set in the "start_profiler.launch" file as the
     // value of the "profiler_ip" argument.
 
-    // mmind::eye::ErrorStatus status;
-    // mmind::eye::ProfilerInfo info;
-    // info.firmwareVersion = mmind::eye::Version("2.4.0");
-    // info.ipAddress = profiler_ip;
-    // info.port = 5577;
-    // status = profiler.connect(info);
-    // if (!status.isOK())
-    // {
-    //     throw status;
-    // }
-    // std::cout << "Connected to the profiler successfully." << std::endl;
+    mmind::eye::ErrorStatus status;
+    mmind::eye::ProfilerInfo info;
+    info.firmwareVersion = mmind::eye::Version("2.5.4");
+    info.ipAddress = profiler_ip;
+    info.port = 5577;
+    status = profiler.connect(info);
+    if (!status.isOK())
+    {
+        throw status;
+    }
+    std::cout << "Connected to the profiler successfully." << std::endl;
 
     mmind::eye::ProfilerInfo profilerInfo;
     showError(profiler.getProfilerInfo(profilerInfo));
     printProfilerInfo(profilerInfo);
 
-    auto status = profiler.registerAcquisitionCallback(callbackFunc, this);
+    status = profiler.registerAcquisitionCallback(callbackFunc, this);
     if (!status.isOK()) {
         throw status;
     }
@@ -264,7 +263,7 @@ void MechMindProfiler::publishIntensityImage(
     pub_intensity->publish(ros_image);
     if (!save_file)
         return;
-    if (cv::imwrite("/tmp/intensity_image.png", intensity))
+    if (cv::imwrite("/tmp/time.time_intensity_image.png", intensity))
         std::cout << "The intensity image is saved to /tmp" << std::endl;
     else
         std::cerr << "Failed to save the intensity image." << std::endl;
