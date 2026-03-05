@@ -81,28 +81,29 @@ void convertToROSMsg3(const mmind::eye::ProfileBatch& batch, float xResolution, 
 
 void callbackFunc3(const mmind::eye::ProfileBatch& batch, void* pUser)
 {
-    auto* mechMindProfiler = static_cast<MechMindProfiler3*>(pUser);
+    auto* mechMindProfiler = static_cast<mechmind3::MechMindProfiler3*>(pUser);
     if (mechMindProfiler)
         mechMindProfiler->handleCallbackBatch(batch);
 }
 } // namespace
 
-MechMindProfiler3::MechMindProfiler3()
+namespace mechmind3 {
+
+MechMindProfiler3::MechMindProfiler3(const rclcpp::NodeOptions & options)
+: rclcpp::Node("mechmind_profiler_publisher_service_3", options)
 {
-    node = rclcpp::Node::make_shared("mechmind_profiler_publisher_service_3");
+    declare_parameter<std::string>("profiler_ip", "192.168.0.39");
+    declare_parameter<bool>("save_file", false);
 
-    node->declare_parameter<std::string>("profiler_ip", "192.168.0.39");
-    node->declare_parameter<bool>("save_file", false);
-
-    node->get_parameter("profiler_ip", profiler_ip);
-    node->get_parameter("save_file", save_file);
+    get_parameter("profiler_ip", profiler_ip);
+    get_parameter("save_file", save_file);
 
     pub_intensity =
-        node->create_publisher<sensor_msgs::msg::Image>("/mechmind_profiler_3/intensity_image", 1);
-    pub_depth = node->create_publisher<sensor_msgs::msg::Image>("/mechmind_profiler_3/depth_map", 1);
+        create_publisher<sensor_msgs::msg::Image>("/mechmind_profiler_3/intensity_image", 1);
+    pub_depth = create_publisher<sensor_msgs::msg::Image>("/mechmind_profiler_3/depth_map", 1);
     pub_pcl =
-        node->create_publisher<sensor_msgs::msg::PointCloud2>("/mechmind_profiler_3/point_cloud", 1);
-    pub_textured_pcl = node->create_publisher<sensor_msgs::msg::PointCloud2>(
+        create_publisher<sensor_msgs::msg::PointCloud2>("/mechmind_profiler_3/point_cloud", 1);
+    pub_textured_pcl = create_publisher<sensor_msgs::msg::PointCloud2>(
         "/mechmind_profiler_3/textured_point_cloud", 1);
 
     mmind::eye::ErrorStatus status;
@@ -127,100 +128,100 @@ MechMindProfiler3::MechMindProfiler3()
     }
 
     start_acquisition_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::StartAcquisition>(
-            "start_acquisition_2", std::bind(&MechMindProfiler3::start_acquisition_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::StartAcquisition>(
+            "start_acquisition_3", std::bind(&MechMindProfiler3::start_acquisition_callback, this,
                                            std::placeholders::_1, std::placeholders::_2));
     stop_acquisition_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::StopAcquisition>(
-            "stop_acquisition_2", std::bind(&MechMindProfiler3::stop_acquisition_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::StopAcquisition>(
+            "stop_acquisition_3", std::bind(&MechMindProfiler3::stop_acquisition_callback, this,
                                           std::placeholders::_1, std::placeholders::_2));
     trigger_software_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::TriggerSoftware>(
-            "trigger_software_2", std::bind(&MechMindProfiler3::trigger_software_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::TriggerSoftware>(
+            "trigger_software_3", std::bind(&MechMindProfiler3::trigger_software_callback, this,
                                           std::placeholders::_1, std::placeholders::_2));
 
-    add_user_set_service = node->create_service<mecheye_profiler_ros_interface::srv::AddUserSet>(
-        "add_user_set_2", std::bind(&MechMindProfiler3::add_user_set_callback, this,
+    add_user_set_service = create_service<mecheye_profiler_ros_interface::srv::AddUserSet>(
+        "add_user_set_3", std::bind(&MechMindProfiler3::add_user_set_callback, this,
                                   std::placeholders::_1, std::placeholders::_2));
 
     delete_user_set_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::DeleteUserSet>(
-            "delete_user_set_2", std::bind(&MechMindProfiler3::delete_user_set_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::DeleteUserSet>(
+            "delete_user_set_3", std::bind(&MechMindProfiler3::delete_user_set_callback, this,
                                          std::placeholders::_1, std::placeholders::_2));
-    profiler_info_service = node->create_service<mecheye_profiler_ros_interface::srv::ProfilerInfo>(
-        "profiler_info_2", std::bind(&MechMindProfiler3::profiler_info_callback, this,
+    profiler_info_service = create_service<mecheye_profiler_ros_interface::srv::ProfilerInfo>(
+        "profiler_info_3", std::bind(&MechMindProfiler3::profiler_info_callback, this,
                                    std::placeholders::_1, std::placeholders::_2));
 
     get_all_user_sets_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::GetAllUserSets>(
-            "get_all_user_sets_2", std::bind(&MechMindProfiler3::get_all_user_sets_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::GetAllUserSets>(
+            "get_all_user_sets_3", std::bind(&MechMindProfiler3::get_all_user_sets_callback, this,
                                            std::placeholders::_1, std::placeholders::_2));
 
     get_current_user_set_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::GetCurrentUserSet>(
-            "get_current_user_set_2", std::bind(&MechMindProfiler3::get_current_user_set_callback,
+        create_service<mecheye_profiler_ros_interface::srv::GetCurrentUserSet>(
+            "get_current_user_set_3", std::bind(&MechMindProfiler3::get_current_user_set_callback,
                                               this, std::placeholders::_1, std::placeholders::_2));
 
     save_all_settings_to_user_sets_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::SaveAllSettingsToUserSets>(
-            "save_all_settings_to_user_sets_2",
+        create_service<mecheye_profiler_ros_interface::srv::SaveAllSettingsToUserSets>(
+            "save_all_settings_to_user_sets_3",
             std::bind(&MechMindProfiler3::save_all_settings_to_user_sets_callback, this,
                       std::placeholders::_1, std::placeholders::_2));
 
     set_current_user_set_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::SetCurrentUserSet>(
-            "set_current_user_set_2", std::bind(&MechMindProfiler3::set_current_user_set_callback,
+        create_service<mecheye_profiler_ros_interface::srv::SetCurrentUserSet>(
+            "set_current_user_set_3", std::bind(&MechMindProfiler3::set_current_user_set_callback,
                                               this, std::placeholders::_1, std::placeholders::_2));
 
     set_int_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::SetIntParameter>(
-            "set_int_parameter_2", std::bind(&MechMindProfiler3::set_int_parameter_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::SetIntParameter>(
+            "set_int_parameter_3", std::bind(&MechMindProfiler3::set_int_parameter_callback, this,
                                            std::placeholders::_1, std::placeholders::_2));
 
     get_int_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::GetIntParameter>(
-            "get_int_parameter_2", std::bind(&MechMindProfiler3::get_int_parameter_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::GetIntParameter>(
+            "get_int_parameter_3", std::bind(&MechMindProfiler3::get_int_parameter_callback, this,
                                            std::placeholders::_1, std::placeholders::_2));
 
     set_float_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::SetFloatParameter>(
-            "set_float_parameter_2", std::bind(&MechMindProfiler3::set_float_parameter_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::SetFloatParameter>(
+            "set_float_parameter_3", std::bind(&MechMindProfiler3::set_float_parameter_callback, this,
                                              std::placeholders::_1, std::placeholders::_2));
 
     get_float_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::GetFloatParameter>(
-            "get_float_parameter_2", std::bind(&MechMindProfiler3::get_float_parameter_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::GetFloatParameter>(
+            "get_float_parameter_3", std::bind(&MechMindProfiler3::get_float_parameter_callback, this,
                                              std::placeholders::_1, std::placeholders::_2));
 
     set_bool_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::SetBoolParameter>(
-            "set_bool_parameter_2", std::bind(&MechMindProfiler3::set_bool_parameter_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::SetBoolParameter>(
+            "set_bool_parameter_3", std::bind(&MechMindProfiler3::set_bool_parameter_callback, this,
                                             std::placeholders::_1, std::placeholders::_2));
 
     get_bool_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::GetBoolParameter>(
-            "get_bool_parameter_2", std::bind(&MechMindProfiler3::get_bool_parameter_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::GetBoolParameter>(
+            "get_bool_parameter_3", std::bind(&MechMindProfiler3::get_bool_parameter_callback, this,
                                             std::placeholders::_1, std::placeholders::_2));
 
     set_enum_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::SetEnumParameter>(
-            "set_enum_parameter_2", std::bind(&MechMindProfiler3::set_enum_parameter_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::SetEnumParameter>(
+            "set_enum_parameter_3", std::bind(&MechMindProfiler3::set_enum_parameter_callback, this,
                                             std::placeholders::_1, std::placeholders::_2));
 
     get_enum_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::GetEnumParameter>(
-            "get_enum_parameter_2", std::bind(&MechMindProfiler3::get_enum_parameter_callback, this,
+        create_service<mecheye_profiler_ros_interface::srv::GetEnumParameter>(
+            "get_enum_parameter_3", std::bind(&MechMindProfiler3::get_enum_parameter_callback, this,
                                             std::placeholders::_1, std::placeholders::_2));
 
     set_profile_roi_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::SetProfileROIParameter>(
-            "set_profile_roi_parameter_2",
+        create_service<mecheye_profiler_ros_interface::srv::SetProfileROIParameter>(
+            "set_profile_roi_parameter_3",
             std::bind(&MechMindProfiler3::set_profile_roi_parameter_callback, this,
                       std::placeholders::_1, std::placeholders::_2));
 
     get_profile_roi_parameter_service =
-        node->create_service<mecheye_profiler_ros_interface::srv::GetProfileROIParameter>(
-            "get_profile_roi_parameter_2",
+        create_service<mecheye_profiler_ros_interface::srv::GetProfileROIParameter>(
+            "get_profile_roi_parameter_3",
             std::bind(&MechMindProfiler3::get_profile_roi_parameter_callback, this,
                       std::placeholders::_1, std::placeholders::_2));
 }
@@ -251,7 +252,7 @@ void MechMindProfiler3::publishIntensityImage(
     sensor_msgs::msg::Image ros_image;
     cv_image.toImageMsg(ros_image);
     ros_image.header.frame_id = "mechmind_profiler_3/intensity_image";
-    ros_image.header.stamp = node->now();
+    ros_image.header.stamp = this->now();
     pub_intensity->publish(ros_image);
     if (!save_file)
         return;
@@ -270,7 +271,7 @@ void MechMindProfiler3::publishDepthMap(mmind::eye::ProfileBatch::DepthMap&& dep
     sensor_msgs::msg::Image ros_depth;
     cv_depth.toImageMsg(ros_depth);
     ros_depth.header.frame_id = "mechmind_profiler_3/depth_map";
-    ros_depth.header.stamp = node->now();
+    ros_depth.header.stamp = this->now();
     pub_depth->publish(ros_depth);
     if (!save_file)
         return;
@@ -324,10 +325,10 @@ void MechMindProfiler3::publishPointClouds(const mmind::eye::ProfileBatch& batch
 
     sensor_msgs::msg::PointCloud2 ros_cloud;
     ros_cloud.header.frame_id = "mechmind_profiler_3/point_cloud";
-    ros_cloud.header.stamp = node->now();
+    ros_cloud.header.stamp = this->now();
     sensor_msgs::msg::PointCloud2 ros_textured_cloud;
     ros_textured_cloud.header.frame_id = "mechmind_profiler_3/textured_point_cloud";
-    ros_textured_cloud.header.stamp = node->now();
+    ros_textured_cloud.header.stamp = this->now();
     convertToROSMsg3(batch, xResolution, yResolution, useEncoderValues, triggerInterval, ros_cloud,
                     ros_textured_cloud);
     pub_pcl->publish(ros_cloud);
@@ -561,3 +562,7 @@ void MechMindProfiler3::set_float_parameter_callback(
     res->error_code = status.errorCode;
     res->error_description = status.errorDescription.c_str();
 }
+
+} // namespace mechmind3
+
+RCLCPP_COMPONENTS_REGISTER_NODE(mechmind3::MechMindProfiler3)

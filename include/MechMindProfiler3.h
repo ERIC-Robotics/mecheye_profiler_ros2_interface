@@ -28,12 +28,12 @@
 #include <mecheye_profiler_ros_interface/srv/set_profile_roi_parameter.hpp>
 #include <mecheye_profiler_ros_interface/srv/get_profile_roi_parameter.hpp>
 
-namespace mechmind {
+namespace mechmind3 {
 
-class MechMindProfiler : public rclcpp::Node
+class MechMindProfiler3 : public rclcpp::Node
 {
 public:
-    explicit MechMindProfiler(const rclcpp::NodeOptions & options);
+    explicit MechMindProfiler3(const rclcpp::NodeOptions & options);
     void handleCallbackBatch(const mmind::eye::ProfileBatch& batch);
 
 private:
@@ -181,4 +181,4 @@ private:
         std::shared_ptr<mecheye_profiler_ros_interface::srv::SetFloatParameter::Response> res);
 };
 
-} // namespace mechmind
+} // namespace mechmind3

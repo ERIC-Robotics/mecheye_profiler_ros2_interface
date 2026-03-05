@@ -11,9 +11,8 @@ int main(int argc, char** argv)
 
     rclcpp::executors::MultiThreadedExecutor executor;
     try {
-        // MechMindProfiler mm_profiler;
-        MechMindProfiler mm_profiler;
-        executor.add_node(mm_profiler.node);
+        auto node = std::make_shared<mechmind::MechMindProfiler>(rclcpp::NodeOptions{});
+        executor.add_node(node);
         executor.spin();
     } catch (mmind::eye::ErrorStatus error) {
         showError(error);
