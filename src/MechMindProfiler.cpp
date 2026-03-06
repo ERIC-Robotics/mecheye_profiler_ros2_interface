@@ -1,7 +1,9 @@
 #include <sstream>
+#include <iomanip>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/int32.hpp>
 #include <profiler/api_util.h>
 #include <pcl/point_cloud.h>
 #include <pcl/io/ply_io.h>
@@ -104,6 +106,19 @@ MechMindProfiler::MechMindProfiler()
         node->create_publisher<sensor_msgs::msg::PointCloud2>("/mechmind_profiler/point_cloud", 1);
     pub_textured_pcl = node->create_publisher<sensor_msgs::msg::PointCloud2>(
         "/mechmind_profiler/textured_point_cloud", 1);
+    pub_max_z_ =
+        node->create_publisher<std_msgs::msg::Int32>("/mechmind_profiler/max_z", 10);
+    pub_object_detected_ =
+        node->create_publisher<std_msgs::msg::Int32>("/mechmind_profiler/object_detected", 10);
+
+    // ── Depth map ring buffer ──────────────────────────────────────────
+    depth_frames_.resize(depth_max_size_);
+    // Use POSIX mkdir — std::filesystem conflicts with the MechMind SDK's bundled libstdc++
+    ::mkdir(depth_output_dir_.c_str(), 0755);
+    RCLCPP_INFO(node->get_logger(),
+                "[Profiler] Depth ring buffer: %zu frames. Output: %s",
+                depth_max_size_, depth_output_dir_.c_str());
+    // ─────────────────────────────────────────────────────────────────────────
 
     // if (!findAndConnect(profiler))
     //     throw mmind::eye::ErrorStatus{mmind::eye::ErrorStatus::MMIND_STATUS_INVALID_DEVICE,
@@ -272,6 +287,64 @@ void MechMindProfiler::publishIntensityImage(
 void MechMindProfiler::publishDepthMap(mmind::eye::ProfileBatch::DepthMap&& depthMap)
 {
     cv::Mat depth = cv::Mat(depthMap.height(), depthMap.width(), CV_32FC1, depthMap.data());
+
+    // ── COMMENTED OUT: max Z distance measurement ───────────────────────────
+    // float max_z     = std::numeric_limits<float>::lowest();
+    // bool valid_found = false;
+    // for (int i = 0; i < depth.rows; ++i)
+    // {
+    //     for (int j = 0; j < depth.cols; ++j)
+    //     {
+    //         float v = depth.at<float>(i, j);
+    //         if (v != 0.0f && !std::isnan(v))
+    //         {
+    //             if (!valid_found || v > max_z)
+    //             {
+    //                 max_z       = v;
+    //                 valid_found = true;
+    //             }
+    //         }
+    //     }
+    // }
+    // if (valid_found)
+    // {
+    //     RCLCPP_INFO(node->get_logger(), "[Profiler] Max Z: %.2f mm", max_z);
+    //     std_msgs::msg::Int32 max_z_msg;
+    //     max_z_msg.data = static_cast<int>(max_z);
+    //     pub_max_z_->publish(max_z_msg);
+    //     std_msgs::msg::Int32 object_msg;
+    //     if (max_z > z_threshold_)
+    //     {
+    //         RCLCPP_INFO(node->get_logger(),
+    //                     "[Profiler] Max Z (%.2f) > threshold (%.1f) -> object detected",
+    //                     max_z, z_threshold_);
+    //         object_msg.data = 1;
+    //     }
+    //     else { object_msg.data = 0; }
+    //     pub_object_detected_->publish(object_msg);
+    // }
+    // else
+    // {
+    //     RCLCPP_WARN(node->get_logger(),
+    //                 "[Profiler] Depth map received but no valid Z data (all 0 or NaN).");
+    // }
+    // ────────────────────────────────────────────────────────────────────────
+
+    // ── Depth map ring buffer ─────────────────────────────────────────────
+    depth_frames_[depth_write_index_] = {node->now().seconds(), depth.clone()};
+    depth_write_index_ = (depth_write_index_ + 1) % depth_max_size_;
+
+    if (depth_write_index_ == 0)
+    {
+        // Buffer just wrapped — it is now full; dump all frames
+        depth_buf_full_ = true;
+        RCLCPP_INFO(node->get_logger(),
+                    "[Profiler] Depth ring buffer full (%zu frames). Dumping to %s ...",
+                    depth_max_size_, depth_output_dir_.c_str());
+        dumpBuffer();
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     cv_bridge::CvImage cv_depth;
     cv_depth.image = depth;
     cv_depth.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
@@ -286,6 +359,40 @@ void MechMindProfiler::publishDepthMap(mmind::eye::ProfileBatch::DepthMap&& dept
         std::cout << "The depth map is saved to /tmp." << std::endl;
     else
         std::cerr << "Failed to save the depth map." << std::endl;
+}
+
+void MechMindProfiler::dumpBuffer()
+{
+    // Frames are stored in insertion order; since write_index_ just rolled over
+    // to 0, index 0 is the oldest frame and depth_max_size_-1 is the newest.
+    int count = 0;
+    for (size_t i = 0; i < depth_max_size_; ++i)
+    {
+        const auto& item = depth_frames_[i];
+        if (item.image.empty())
+            continue;
+
+        // Always TIFF because the depth map is CV_32FC1 (floating-point)
+        std::stringstream ss;
+        ss << depth_output_dir_ << "/"
+           << std::fixed << std::setprecision(6)
+           << item.timestamp_sec
+           << ".tiff";
+
+        if (!cv::imwrite(ss.str(), item.image))
+            RCLCPP_WARN(node->get_logger(),
+                        "[Profiler] Failed to save frame to %s", ss.str().c_str());
+        else
+            ++count;
+    }
+
+    RCLCPP_INFO(node->get_logger(),
+                "[Profiler] Depth buffer dump complete: %d/%zu frames saved to %s",
+                count, depth_max_size_, depth_output_dir_.c_str());
+
+    // Reset buffer so the next 10000 frames fill a fresh batch
+    depth_write_index_ = 0;
+    depth_buf_full_    = false;
 }
 
 void MechMindProfiler::publishPointClouds(const mmind::eye::ProfileBatch& batch,

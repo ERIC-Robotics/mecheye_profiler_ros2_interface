@@ -2,10 +2,14 @@
 #include <profiler/Profiler.h>
 #include <rclcpp/rclcpp.hpp>
 #include <memory>
+#include <vector>
+#include <string>
+#include <sys/stat.h>
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <cv_bridge/cv_bridge.h>
+#include <std_msgs/msg/int32.hpp>
 #include <mecheye_profiler_ros_interface/srv/start_acquisition.hpp>
 #include <mecheye_profiler_ros_interface/srv/stop_acquisition.hpp>
 #include <mecheye_profiler_ros_interface/srv/trigger_software.hpp>
@@ -27,6 +31,11 @@
 #include <mecheye_profiler_ros_interface/srv/set_profile_roi_parameter.hpp>
 #include <mecheye_profiler_ros_interface/srv/get_profile_roi_parameter.hpp>
 
+struct BufferedFrame {
+    double  timestamp_sec = 0.0;   // ROS time as seconds (avoids rclcpp::Time default-ctor overhead)
+    cv::Mat image;
+};
+    
 class MechMindProfiler
 {
 public:
@@ -44,11 +53,24 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_depth;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_pcl;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_textured_pcl;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_max_z_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_object_detected_;
+
+    double z_threshold_ = -44.0;
 
     void publishIntensityImage(mmind::eye::ProfileBatch::IntensityImage&& intensityImage);
     void publishDepthMap(mmind::eye::ProfileBatch::DepthMap&& depthMap);
     void publishPointClouds(const mmind::eye::ProfileBatch& batch,
                             const mmind::eye::UserSet& userSet);
+
+    // ── Depth map ring buffer ───────────────────────────────────────────────
+    void dumpBuffer();
+
+    std::vector<BufferedFrame> depth_frames_;
+    size_t  depth_write_index_ = 0;
+    size_t  depth_max_size_    = 500;
+    bool    depth_buf_full_    = false;
+    std::string depth_output_dir_ = "mechmind_depth_buffer_output_5";
 
     rclcpp::Service<mecheye_profiler_ros_interface::srv::StartAcquisition>::SharedPtr
         start_acquisition_service;
