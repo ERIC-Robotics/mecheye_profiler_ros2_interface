@@ -64,8 +64,13 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 
 link_directories(/opt/mech-mind/mech-eye-sdk/lib)
 
-aux_source_directory(src SRC_LIST)
-add_executable(start ${SRC_LIST})
+# aux_source_directory(src SRC_LIST)
+add_executable(start 
+    src/main.cpp 
+    src/MechMindProfiler.cpp 
+    src/DepthAnalyzer.cpp
+)
+
 ament_target_dependencies(start
     cv_bridge
     image_transport
@@ -77,8 +82,6 @@ ament_target_dependencies(start
     pcl_conversions
 )
 
-# aux_source_directory(src SRC_LIST)
-# add_executable(start ${SRC_LIST})
 target_link_libraries(start
     ${PCL_LIBRARIES}
     ${OpenCV_LIBRARIES}
@@ -91,6 +94,7 @@ rosidl_target_interfaces(start ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 install(TARGETS start
     DESTINATION lib/${PROJECT_NAME})
+
 
 ament_export_dependencies(
     cv_bridge
